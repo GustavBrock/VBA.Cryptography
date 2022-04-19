@@ -30,7 +30,11 @@ The last demonstrates how to save and verify passwords totally safe using these 
 
 ## Part 1. Compatible with other environments
 
-However, as comprehensive as the Microsoft CNG API is, as is the complexity. Thus, it takes a lot of work and good understanding of cryptography to implement this API in high-level functions that are easy to apply in projects and applications.
+However, as comprehensive as the Microsoft CNG API is, as is the complexity - as you can see when studying the official documentation:
+
+[Cryptography API: Next Generation](https://docs.microsoft.com/en-us/windows/win32/seccng/cng-portal)
+
+Thus, it takes a lot of work and good understanding of cryptography to implement this API in high-level functions that are easy to apply in projects and applications.
 
 In the **.Net framework**, the complexity of the API has been carefully hidden to make it quite simple and fast to, say, calculate a hash value:
 
@@ -296,7 +300,7 @@ End Function
 
 For both functions, documentation is included in-line. If you wonder about the math used for the calculations, it is purely empiric, reduced to an acceptable minimum to keep it readable.
 
-As you can see, storing encrypted text raises some challenges compared to storing plain text. These will be discussed in Part 4: [Using binary storage to serve the Microsoft NG Cryptography (CNG) API](https://github.com/GustavBrock/Veeam.Linux/blob/main/Linux%20Repository%203.md).
+As you can see, storing encrypted text raises some challenges compared to storing plain text. These will be discussed in Part 4: [Using binary storage to serve the Microsoft NG Cryptography (CNG) API](https://github.com/GustavBrock/VBA.Cryptography/blob/main/Next%20Generation%20Cryptography%20Part%204.md).
 
 Similar functions for binary storage are also included. Further, and much simpler, is a function, `HashTextLength`, to return the sizes of hash values. These are fixed, determined by the hash algorithm:
 
