@@ -55,4 +55,4 @@ Demo applications for *Microsoft Access* and *Microsoft Excel* tested with *Micr
 
 *If you wish to support my work or need extended support or advice, feel free to:*
 
-[<img src="https://raw.githubusercontent.com/GustavBrock/VBA.Cryptography/master/images/BuyMeACoffee.png">](https://www.buymeacoffee.com/gustav/)
+[<img src="https://raw.githubusercontent.com/GustavBrock/VBA.ModernBox/master/images/BuyMeACoffee.png">](https://www.buymeacoffee.com/gustav/)
