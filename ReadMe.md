@@ -47,7 +47,7 @@ Full documentation can also be found here:
 
 ![EE Logo](images/EE%20Logo.png)
 
-[Next Generation Cryptography](https://www.experts-exchange.com/articles/37111/Utilise-Microsoft's-Next-Generation-Cryptography-CNG-API-in-VBA.html)
+[Next Generation Cryptography](https://www.experts-exchange.com/articles/37111/Utilise-Microsoft's-Next-Generation-Cryptography-CNG-API-in-VBA.html?preview=/HbguS9iNco%3D)
 
 Demo applications for *Microsoft Access* and *Microsoft Excel* tested with *Microsoft 365* are located in the *demos* folder. 
 
