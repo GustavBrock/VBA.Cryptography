@@ -2,7 +2,7 @@ Attribute VB_Name = "BCrypt"
 Option Compare Binary
 Option Explicit
 '
-' BCrypt V1.1.2
+' BCrypt V1.1.3
 ' Hashing, encrypting, and decrypting of text using the BCrypt API.
 '
 ' (c) Gustav Brock, Cactus Data ApS, CPH
@@ -1339,6 +1339,11 @@ End Function
 ' Return a Base64 encoded hash of a string using the specified hash algorithm.
 ' By default, hash algorithm SHA256 is used.
 '
+' By default, the Text value is processed as Unicode.
+' Optionally, the Text is processed as ANSI which is required for, say, OAuth2 tokens.
+' Reference:
+'   https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/strconv-function
+'
 ' Example:
 '   Text = "Get your filthy hands off my desert."
 '   Value = Hash(Text)
@@ -1355,19 +1360,27 @@ End Function
 '   SHA384      64
 '   SHA512      88
 '
-' 2021-10-24. Gustav Brock, Cactus Data ApS, CPH.
+' 2024-08-08. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function Hash( _
     ByVal Text As String, _
-    Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = BcHashAlgorithm.bcSha256) _
+    Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = BcHashAlgorithm.bcSha256, _
+    Optional ByVal AnsiEncoding As Boolean) _
     As String
+    
+    Dim TextData()          As Byte
     
     Dim HashBase64          As String
     
     If Text = "" Then
         ' No data. Nothing to do.
     Else
-        HashBase64 = ByteBase64(HashData((Text), BcryptHashAlgorithmId))
+        If AnsiEncoding Then
+            TextData = StrConv(Text, vbFromUnicode)
+        Else
+            TextData = Text
+        End If
+        HashBase64 = ByteBase64(HashData(TextData, BcryptHashAlgorithmId))
     End If
     
     Hash = HashBase64
