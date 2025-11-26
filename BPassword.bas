@@ -2,7 +2,7 @@ Attribute VB_Name = "BPassword"
 Option Compare Database
 Option Explicit
 '
-' BPassword V1.1.3
+' BPassword V1.2.0
 ' Handling and binary storing of hashed passwords using DAO and the BCrypt API.
 '
 ' (c) Gustav Brock, Cactus Data ApS, CPH
@@ -10,8 +10,17 @@ Option Explicit
 '
 ' Requires:
 '   Module BCrypt
-'
 
+' Default table and field names. Modify as needed.
+Private Const DefaultTableName  As String = "User"
+Private Const DefaultFieldName  As String = "Password"
+
+' Current table and field names.
+' Call sub SetCurrentTableFieldName to modify the current
+' table name and/or field name, or the default names will be used.
+Private CurrentTableName        As String
+Private CurrentFieldName        As String
+   
 ' Append, to an existing DAO table, a binary field optimised for
 ' storing a BCrypt hash value using a hash algorithm as specified by
 ' the argument BcryptHashAlgorithmId.
@@ -19,21 +28,21 @@ Option Explicit
 '
 ' By default, the size of the field will be set to match SHA256.
 '
-' 2022-02-14. Gustav Brock, Cactus Data ApS, CPH.
+' 2025-11-26. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function AppendPasswordField( _
     ByVal Database As DAO.Database, _
-    ByVal TableName As String, _
-    Optional ByVal FieldName As String = "Password", _
     Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = bcSha256) _
     As Boolean
     
     Dim FieldSize   As Integer
     Dim Success     As Boolean
     
+    SetCurrentTableFieldName
+    
     ' Find the required field size for this hash algorithm.
     FieldSize = HashByteLength(BcryptHashAlgorithmId)
-    Success = AppendBinaryField(Database, TableName, FieldName, FieldSize)
+    Success = AppendBinaryField(Database, CurrentTableName, CurrentFieldName, FieldSize)
     
     AppendPasswordField = Success
 
@@ -62,7 +71,7 @@ End Function
 ' Returns a byte array if a hash value is found.
 ' Returns an empty byte array, if the ID is not found, or the password is empty.
 '
-' 2022-04-07. Gustav Brock, Cactus Data ApS, CPH.
+' 2025-11-26. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function ReadPassword( _
     ByVal Id As Long) _
@@ -74,7 +83,9 @@ Public Function ReadPassword( _
     
     Dim Data()      As Byte
     
-    Data = ReadBinaryField(CurrentDb, DefaultTableName, DefaultFieldName, Id)
+    SetCurrentTableFieldName
+    
+    Data = ReadBinaryField(CurrentDb, CurrentTableName, CurrentFieldName, Id)
         
     ReadPassword = Data
     
@@ -106,21 +117,19 @@ End Function
 '
 ' By default, the hash algorithm SHA256 is applied.
 '
-' 2022-04-08. Gustav Brock, Cactus Data ApS, CPH.
+' 2025-11-26. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function SavePassword( _
     ByVal Id As Long, _
     Optional ByVal Password As String, _
     Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = bcSha256) _
     As Boolean
-    
-    ' Table and field names. Modify as needed.
-    Const DefaultTableName  As String = "User"
-    Const DefaultFieldName  As String = "Password"
-    
+       
     Dim Data()      As Byte
     Dim TextData()  As Byte
     Dim Success     As Boolean
+    
+    SetCurrentTableFieldName
     
     If Password = "" Then
         ' Reset saved password.
@@ -130,11 +139,35 @@ Public Function SavePassword( _
     End If
     
     Data = HashData(TextData, BcryptHashAlgorithmId)
-    Success = SaveBinaryField(CurrentDb, DefaultTableName, DefaultFieldName, Id, Data)
+    Success = SaveBinaryField(CurrentDb, CurrentTableName, CurrentFieldName, Id, Data)
     
     SavePassword = Success
     
 End Function
+
+' Set the table name and field name to be used for storing password.
+' Should be called initally if other names than the default shall be used.
+' If not called, all functions will use the default table and field names.
+'
+' 2025-11-26. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Sub SetCurrentTableFieldName( _
+    Optional ByVal TableName As String, _
+    Optional ByVal FieldName As String)
+    
+    If Trim(TableName) <> "" Then
+        CurrentTableName = TableName
+    Else
+        CurrentTableName = DefaultTableName
+    End If
+    
+    If Trim(FieldName) <> "" Then
+        CurrentFieldName = FieldName
+    Else
+        CurrentFieldName = DefaultFieldName
+    End If
+    
+End Sub
 
 ' Verify, for an ID, a password (salted with the unique Id) by comparing the
 ' hash value, using the specified hash algorithm, with the stored hash value.
