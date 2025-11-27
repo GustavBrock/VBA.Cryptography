@@ -2,7 +2,7 @@ Attribute VB_Name = "BCrypt"
 Option Compare Binary
 Option Explicit
 '
-' BCrypt V1.1.3
+' BCrypt V1.2.0
 ' Hashing, encrypting, and decrypting of text using the BCrypt API.
 '
 ' (c) Gustav Brock, Cactus Data ApS, CPH
@@ -23,19 +23,29 @@ Option Explicit
 
 ' API declarations.
 '
-Private Declare PtrSafe Function BCryptOpenAlgorithmProvider Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptOpenAlgorithmProvider Lib "bcrypt.dll" ( _
     ByRef phAlgorithm As LongPtr, _
     ByVal pszAlgId As LongPtr, _
     ByVal pszImplementation As LongPtr, _
     ByVal dwFlags As Long) _
     As Long
     
-Private Declare PtrSafe Function BCryptCloseAlgorithmProvider Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptCloseAlgorithmProvider Lib "bcrypt.dll" ( _
     ByVal hAlgorithm As LongPtr, _
     ByVal dwFlags As Long) _
     As Long
     
-Private Declare PtrSafe Function BCryptGetProperty Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptHash Lib "bcrypt.dll" ( _
+    ByVal hAlgorithm As LongPtr, _
+    ByVal pbSecret As LongPtr, _
+    ByVal cbSecret As Long, _
+    ByVal pbInput As LongPtr, _
+    ByVal cbInput As Long, _
+    ByVal pbOutput As LongPtr, _
+    ByVal cbOutput As Long) _
+    As Long
+
+Private Declare PtrSafe Function BCryptGetProperty Lib "bcrypt.dll" ( _
     ByVal hObject As LongPtr, _
     ByVal pszProperty As LongPtr, _
     ByRef pbOutput As Any, _
@@ -44,7 +54,7 @@ Private Declare PtrSafe Function BCryptGetProperty Lib "BCrypt.dll" ( _
     ByVal dfFlags As Long) _
     As Long
     
-Private Declare PtrSafe Function BCryptSetProperty Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptSetProperty Lib "bcrypt.dll" ( _
     ByVal hObject As LongPtr, _
     ByVal pszProperty As LongPtr, _
     ByRef pbInput As Any, _
@@ -52,7 +62,7 @@ Private Declare PtrSafe Function BCryptSetProperty Lib "BCrypt.dll" ( _
     ByVal dfFlags As Long) _
     As Long
     
-Private Declare PtrSafe Function BCryptCreateHash Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptCreateHash Lib "bcrypt.dll" ( _
     ByVal hAlgorithm As LongPtr, _
     ByRef phHash As LongPtr, _
     ByRef pbHashObject As Any, _
@@ -62,32 +72,32 @@ Private Declare PtrSafe Function BCryptCreateHash Lib "BCrypt.dll" ( _
     ByVal dwFlags As Long) _
     As Long
 
-Private Declare PtrSafe Function BCryptHashData Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptHashData Lib "bcrypt.dll" ( _
     ByVal hHash As LongPtr, _
     ByRef pbInput As Any, _
     ByVal cbInput As Long, _
     Optional ByVal dwFlags As Long = 0) _
     As Long
 
-Private Declare PtrSafe Function BCryptFinishHash Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptFinishHash Lib "bcrypt.dll" ( _
     ByVal hHash As LongPtr, _
     ByRef pbOutput As Any, _
     ByVal cbOutput As Long, _
     ByVal dwFlags As Long) _
     As Long
 
-Private Declare PtrSafe Function BCryptDestroyHash Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptDestroyHash Lib "bcrypt.dll" ( _
     ByVal hHash As LongPtr) _
     As Long
 
-Private Declare PtrSafe Function BCryptGenRandom Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptGenRandom Lib "bcrypt.dll" ( _
     ByVal hAlgorithm As LongPtr, _
     ByRef pbBuffer As Any, _
     ByVal cbBuffer As Long, _
     ByVal dwFlags As Long) _
     As Long
 
-Private Declare PtrSafe Function BCryptGenerateSymmetricKey Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptGenerateSymmetricKey Lib "bcrypt.dll" ( _
     ByVal hAlgorithm As LongPtr, _
     ByRef hKey As LongPtr, _
     ByRef pbKeyObject As Any, _
@@ -97,7 +107,7 @@ Private Declare PtrSafe Function BCryptGenerateSymmetricKey Lib "BCrypt.dll" ( _
     ByVal dwFlags As Long) _
     As Long
 
-Private Declare PtrSafe Function BCryptEncrypt Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptEncrypt Lib "bcrypt.dll" ( _
     ByVal hKey As LongPtr, _
     ByRef pbInput As Any, _
     ByVal cbInput As Long, _
@@ -110,7 +120,7 @@ Private Declare PtrSafe Function BCryptEncrypt Lib "BCrypt.dll" ( _
     ByVal dwFlags As Long) _
     As Long
 
-Private Declare PtrSafe Function BCryptDecrypt Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptDecrypt Lib "bcrypt.dll" ( _
     ByVal hKey As LongPtr, _
     ByRef pbInput As Any, _
     ByVal cbInput As Long, _
@@ -123,7 +133,7 @@ Private Declare PtrSafe Function BCryptDecrypt Lib "BCrypt.dll" ( _
     ByVal dwFlags As Long) _
     As Long
 
-Private Declare PtrSafe Function BCryptDestroyKey Lib "BCrypt.dll" ( _
+Private Declare PtrSafe Function BCryptDestroyKey Lib "bcrypt.dll" ( _
     ByVal hKey As LongPtr) _
     As Long
 
@@ -132,11 +142,24 @@ Private Declare PtrSafe Sub RtlMoveMemory Lib "Kernel32.dll" ( _
     ByRef Source As Any, _
     ByVal Length As LongPtr)
 
+Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" ( _
+    ByVal CodePage As Long, _
+    ByVal dwFlags As Long, _
+    ByVal lpWideCharStr As LongPtr, _
+    ByVal cchWideChar As Long, _
+    ByVal lpMultiByteStr As LongPtr, _
+    ByVal cbMultiByte As Long, _
+    ByVal lpDefaultChar As LongPtr, _
+    ByVal lpUsedDefaultChar As LongPtr) _
+    As Long
+
 
 ' Constants for API.
 '
-Private Const BcryptBlockPadding    As Long = 1
-Private Const StatusNtSuccess       As Long = 0
+Private Const BcryptAlgHandleHmacFlag   As Long = &H8
+Private Const BcryptBlockPadding        As Long = 1
+Private Const StatusNtSuccess           As Long = 0
+Private Const CpUtf8                    As Long = 65001
 
 
 ' User defined types.
@@ -157,11 +180,13 @@ Public Enum BcHashAlgorithm
     bcMd2 = 1
     bcMd4 = 2
     bcMd5 = 3
+    [_FirstHmac] = 4
     bcSha1 = 4
     bcSha256 = 5
     bcSha384 = 6
     bcSha512 = 7
     [_Last] = 7
+    [_LastHmac] = 7
 End Enum
 
 ' Allowed BCrypt random algorithms.
@@ -716,6 +741,66 @@ Private Function CngHash( _
     End If
     If Hash <> 0 Then
         BCryptDestroyHash Hash
+    End If
+
+End Function
+
+' Create a HMAC (Hash-Based Message Authentication Code) hash of the data at pointer Data by
+' using the Next Generation Cryptography API.
+' Returns the hash as a byte array.
+'
+' To be called from function HmacData.
+'
+' Allowed algorithms (NB: HMAC Hash algorithms only; check OS support):
+'   https://docs.microsoft.com/en-us/windows/desktop/SecCNG/cng-algorithm-identifiers
+'
+' Loosely based on the method described at:
+'   https://docs.microsoft.com/en-us/windows/desktop/SecCNG/creating-a-hash-with-cng
+'
+' 2025-11-25. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function CngHmac( _
+    ByRef TextData As LongPtr, _
+    ByVal TextDataLength As Long, _
+    ByRef KeyData As LongPtr, _
+    ByVal KeyDataLength As Long, _
+    Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = BcHashAlgorithm.bcSha256) _
+    As Byte()
+    
+    Const Implementation    As LongPtr = 0
+    Const Flags             As Long = 0
+    
+    Dim Data()              As Byte
+    
+    Dim Algorithm           As LongPtr
+    Dim AlgorithmId         As String
+    Dim DataLength          As Long
+    Dim Status              As Long
+
+    ' Validate requested hash algorithm.
+    If Not IsBcryptHashHmacAlgorithmId(BcryptHashAlgorithmId) Then
+        ' Invalid hash algorithm for HMAC. Use default hash algorithm.
+        BcryptHashAlgorithmId = DefaultBcHashAlgorithm
+    End If
+
+    ' Open algorithmprovider as HMAC.
+    AlgorithmId = BcryptHashAlgorithm(BcryptHashAlgorithmId)
+    Status = BCryptOpenAlgorithmProvider(Algorithm, StrPtr(AlgorithmId), Implementation, BcryptAlgHandleHmacFlag)
+    
+    If Status = StatusNtSuccess Then
+        ' Determine digest size based on the algorithm id.
+        DataLength = HashByteLength(BcryptHashAlgorithmId)
+        ReDim Data(0 To DataLength - 1)
+        ' Create the HMAC hash value.
+        If BCryptHash(Algorithm, KeyData, KeyDataLength, TextData, TextDataLength, VarPtr(Data(0)), DataLength) = StatusNtSuccess Then
+            ' Return the HMAC hash.
+            CngHmac = Data
+        End If
+    End If
+
+    ' Clean up.
+    If Algorithm <> 0 Then
+        BCryptCloseAlgorithmProvider Algorithm, Flags
     End If
 
 End Function
@@ -1432,13 +1517,14 @@ Public Function HashData( _
     As Byte()
     
     Dim Data()          As Byte
-    Dim DataLength      As Long
+    
+    Dim TextDataLength  As Long
     
     If StrPtr(TextData) = 0 Then
         ' Array TextData is empty.
     Else
-        DataLength = UBound(TextData) - LBound(TextData) + 1
-        Data = CngHash(VarPtr(TextData(LBound(TextData))), DataLength, BcryptHashAlgorithmId)
+        TextDataLength = UBound(TextData) - LBound(TextData) + 1
+        Data = CngHash(VarPtr(TextData(LBound(TextData))), TextDataLength, BcryptHashAlgorithmId)
     End If
     
     HashData = Data
@@ -1474,6 +1560,85 @@ Public Function HashTextLength( _
     End Select
     
     HashTextLength = Length
+    
+End Function
+
+' Return a Base64 encoded HMAC (Hash-Based Message Authentication Code) hash of a string
+' using the specified hash algorithm.
+' By default, hash algorithm SHA256 is used.
+'
+' Example:
+'   Text = "Several Species of Small Furry Animals Gathered Together in a Cave and Grooving With a Pict Lyrics."
+'   Key = "Sysyphus"
+'   Value = Hmac(Text, Key)
+'   Value -> "KoSbRMsshQwgNKi9H2uG5NDyl+qdzNM6s2tG8AM9wk8="
+'   Value = Hmac(Text, Key, bcSha512)
+'   Value -> "+B2HzGp8bWfdE1WihvobFQEbAX91zdDA8fiGXFuAT4fjjBquEU55K5ooSOO3jJYN8NPLdySQf5DVR1y31rHkhQ=="
+'
+' Length of the generated Base64 encoded hash string:
+'
+'   Encoding    Length
+'   SHA1        28
+'   SHA256      44      ' Default.
+'   SHA384      64
+'   SHA512      88
+'
+' 2025-11-25. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function Hmac( _
+    ByVal Text As String, _
+    ByVal Key As String, _
+    Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = BcHashAlgorithm.bcSha256) _
+    As String
+    
+    Dim TextData()          As Byte
+    Dim KeyData()           As Byte
+    
+    Dim HmacBase64          As String
+    
+    If Text = "" Or Key = "" Then
+        ' No data. Nothing to do.
+    Else
+        ' UTF-8 encode Text and Key.
+        TextData = TextUtf8Bytes(Text)
+        KeyData = TextUtf8Bytes(Key)
+        HmacBase64 = ByteBase64(HmacData(TextData, KeyData, BcryptHashAlgorithmId))
+    End If
+    
+    Hmac = HmacBase64
+    
+End Function
+
+' Create and return the HMAC (Hash-Based Message Authentication Code) hash of a byte array as
+' another byte array using the specified hash algorithm.
+' By default, hash algorithm SHA256 is used.
+'
+' To be called from function Hmac.
+'
+' 2025-11-26. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function HmacData( _
+    ByRef TextData() As Byte, _
+    ByRef KeyData() As Byte, _
+    Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = BcHashAlgorithm.bcSha256) _
+    As Byte()
+    
+    Dim Data()          As Byte
+    
+    Dim TextDataLength  As Long
+    Dim KeyDataLength   As Long
+    
+    If StrPtr(TextData) = 0 Then
+        ' Array TextData is empty.
+    ElseIf StrPtr(KeyData) = 0 Then
+        ' Array KeyData is empty.
+    Else
+        TextDataLength = UBound(TextData) - LBound(TextData) + 1
+        KeyDataLength = UBound(KeyData) - LBound(KeyData) + 1
+        Data = CngHmac(VarPtr(TextData(LBound(TextData))), TextDataLength, VarPtr(KeyData(LBound(KeyData))), KeyDataLength, BcryptHashAlgorithmId)
+    End If
+    
+    HmacData = Data
     
 End Function
 
@@ -1518,6 +1683,50 @@ Public Function IsBcryptHashAlgorithmId( _
     End If
     
     IsBcryptHashAlgorithmId = Result
+    
+End Function
+
+' Return True if the passed text value represents a value of
+' enum BcHashAlgorithm valid for HMAC.
+' Note: To validate, HashAlgorithm must be in UPPERCASE.
+'
+' 2025-11-25. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function IsBcryptHashHmacAlgorithm( _
+    ByVal HashAlgorithm As String) _
+    As Boolean
+    
+    Dim Index           As BcHashAlgorithm
+    Dim Result          As Boolean
+    
+    For Index = BcHashAlgorithm.[_FirstHmac] To BcHashAlgorithm.[_LastHmac]
+        If BcryptHashAlgorithm(Index) = HashAlgorithm Then
+            Result = True
+            Exit For
+        End If
+    Next
+    
+    IsBcryptHashHmacAlgorithm = Result
+    
+End Function
+
+' Return True if the passed value of enum BcHashAlgorithm is valid for HMAC.
+'
+' To be called from function CngHmac.
+'
+' 2025-11-25. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function IsBcryptHashHmacAlgorithmId( _
+    ByVal HashAlgorithmId As BcHashAlgorithm) _
+    As Boolean
+    
+    Dim Result          As Boolean
+    
+    If BcHashAlgorithm.[_FirstHmac] <= HashAlgorithmId And HashAlgorithmId <= BcHashAlgorithm.[_LastHmac] Then
+        Result = True
+    End If
+    
+    IsBcryptHashHmacAlgorithmId = Result
     
 End Function
 
@@ -1647,5 +1856,34 @@ Public Function TextBase64( _
     
     TextBase64 = Text64
 
+End Function
+
+' Convert a string to an UTF-8 encoded byte array.
+' Returns the converted string as an array.
+'
+' 2025-11-25. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function TextUtf8Bytes( _
+    ByVal Text As String) _
+    As Byte()
+    
+    Const Flags             As Long = 0
+    Const DefaultChar       As LongPtr = 0
+    Const UsedDefaultChar   As LongPtr = 0
+    Const MultiByte         As Long = 0
+    Const MultiByteStr      As LongPtr = 0
+    
+    Dim Data()              As Byte
+    
+    Dim Length              As Long
+    
+    Length = WideCharToMultiByte(CpUtf8, Flags, StrPtr(Text), Len(Text), MultiByteStr, MultiByte, DefaultChar, UsedDefaultChar)
+    If Length > 0 Then
+        ReDim Data(0 To Length - 1)
+        Call WideCharToMultiByte(CpUtf8, Flags, StrPtr(Text), Len(Text), VarPtr(Data(0)), Length, DefaultChar, UsedDefaultChar)
+    End If
+    
+    TextUtf8Bytes = Data
+    
 End Function
 
