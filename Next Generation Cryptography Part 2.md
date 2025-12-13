@@ -26,7 +26,7 @@ The series has been split in six parts. This allows you to skip parts you are ei
 5. [Storing passwords in VBA using the Microsoft NG Cryptography (CNG) API](https://github.com/GustavBrock/VBA.Cryptography/blob/main/Next%20Generation%20Cryptography%20Part%205.md)
 6. [HMAC hashing in VBA using the Microsoft NG Cryptography (CNG) API](https://github.com/GustavBrock/VBA.Cryptography/blob/main/Next%20Generation%20Cryptography%20Part%206.md)
 
-The three first and the last, as stated, with hashing and encrypting/decrypting based on the CNG API, while the forth explains how to combine these techniques with the little known feature of Access, *storing binary data*, as this in many cases will represent the optimal storage method for hashed or encrypted data.
+The three first and the last, as stated, with hashing and encrypting/decrypting based on the CNG API, while the fourth explains how to combine these techniques with the little known feature of Access, *storing binary data*, as this in many cases will represent the optimal storage method for hashed or encrypted data.
 The fifth demonstrates how to save and verify passwords totally safe using these tools.
 
 ## Part 2. Hashing
