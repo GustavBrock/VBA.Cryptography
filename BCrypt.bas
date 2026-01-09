@@ -2,7 +2,7 @@ Attribute VB_Name = "BCrypt"
 Option Compare Binary
 Option Explicit
 '
-' BCrypt V1.2.0
+' BCrypt V1.2.1
 ' Hashing, encrypting, and decrypting of text using the BCrypt API.
 '
 ' (c) Gustav Brock, Cactus Data ApS, CPH
@@ -18,7 +18,7 @@ Option Explicit
 '
 ' CNG API documentation:
 '   Cryptography API: Next Generation
-'   https://docs.microsoft.com/en-us/windows/win32/seccng/cng-portal
+'   https://learn.microsoft.com/en-us/windows/win32/seccng/cng-portal
 
 
 ' API declarations.
@@ -140,6 +140,10 @@ Private Declare PtrSafe Function BCryptDestroyKey Lib "bcrypt.dll" ( _
 Private Declare PtrSafe Sub RtlMoveMemory Lib "Kernel32.dll" ( _
     ByRef Destination As Any, _
     ByRef Source As Any, _
+    ByVal Length As LongPtr)
+    
+Private Declare PtrSafe Sub RtlZeroMemory Lib "Kernel32.dll" ( _
+    ByRef Destination As Any, _
     ByVal Length As LongPtr)
 
 Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" ( _
@@ -475,15 +479,15 @@ End Function
 '       Byte array containing decrypted data.
 '
 ' Original code by Erik A, 2019.
-' 2021-10-24. Gustav Brock, Cactus Data ApS, CPH.
+' 2026-01-08. Gustav Brock, Cactus Data ApS, CPH.
 '
 Private Function CngDecrypt( _
-    ByRef Data As LongPtr, _
-    ByRef DataLength As Long, _
-    ByRef IVectorInput As LongPtr, _
+    ByVal Data As LongPtr, _
+    ByVal DataLength As Long, _
+    ByVal IVectorInput As LongPtr, _
     ByVal IVectorInputLength As Long, _
-    ByRef Secret As LongPtr, _
-    ByRef SecretLength As Long) _
+    ByVal Secret As LongPtr, _
+    ByVal SecretLength As Long) _
     As Byte()
     
     Const Implementation    As LongPtr = 0
@@ -538,7 +542,7 @@ Private Function CngDecrypt( _
 
     If Status = StatusNtSuccess Then
         ' Create KeyObject using secret.
-        If BCryptGenerateSymmetricKey(Algorithm, Key, KeyObject(1), KeyObjectLength, ByVal Secret, SecretLength, Flags) = StatusNtSuccess Then
+        If BCryptGenerateSymmetricKey(Algorithm, Key, KeyObject(0), KeyObjectLength, ByVal Secret, SecretLength, Flags) = StatusNtSuccess Then
             ' Calculate output buffer size and allocate output buffer.
             If BCryptDecrypt(Key, ByVal Data, DataLength, ByVal 0, IVector(0), IVectorLength, ByVal 0, 0, PlainTextLength, BcryptBlockPadding) = StatusNtSuccess Then
                 ReDim PlainText(0 To PlainTextLength - 1)
@@ -551,11 +555,18 @@ Private Function CngDecrypt( _
     End If
     
     ' Clean up.
+    If Key <> 0 Then
+        BCryptDestroyKey Key
+    End If
     If Algorithm <> 0 Then
         BCryptCloseAlgorithmProvider Algorithm, Flags
     End If
-    If Key <> 0 Then
-        BCryptDestroyKey Key
+
+    If KeyObjectLength > 0 Then
+        RtlZeroMemory KeyObject(0), KeyObjectLength
+    End If
+    If IVectorLength > 0 Then
+        RtlZeroMemory IVector(0), IVectorLength
     End If
 
 End Function
@@ -575,7 +586,7 @@ End Function
 '       Byte array containing encrypted data.
 '
 ' Original code by Erik A, 2019.
-' 2021-10-24. Gustav Brock, Cactus Data ApS, CPH.
+' 2026-01-08. Gustav Brock, Cactus Data ApS, CPH.
 '
 Private Function CngEncrypt( _
     ByVal Data As LongPtr, _
@@ -652,11 +663,18 @@ Private Function CngEncrypt( _
     End If
     
     ' Clean up.
+    If Key <> 0 Then
+        BCryptDestroyKey Key
+    End If
     If Algorithm <> 0 Then
         BCryptCloseAlgorithmProvider Algorithm, Flags
     End If
-    If Key <> 0 Then
-        BCryptDestroyKey Key
+
+    If KeyObjectLength > 0 Then
+        RtlZeroMemory KeyObject(0), KeyObjectLength
+    End If
+    If IVectorLength > 0 Then
+        RtlZeroMemory IVector(0), IVectorLength
     End If
 
 End Function
@@ -673,10 +691,10 @@ End Function
 '   https://docs.microsoft.com/en-us/windows/desktop/SecCNG/creating-a-hash-with-cng
 '
 ' Original code by Erik A, 2019.
-' 2021-10-24. Gustav Brock, Cactus Data ApS, CPH.
+' 2026-01-08. Gustav Brock, Cactus Data ApS, CPH.
 '
 Private Function CngHash( _
-    ByRef Data As LongPtr, _
+    ByVal Data As LongPtr, _
     ByVal DataLength As Long, _
     Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = BcHashAlgorithm.bcSha256) _
     As Byte()
@@ -757,12 +775,12 @@ End Function
 ' Loosely based on the method described at:
 '   https://docs.microsoft.com/en-us/windows/desktop/SecCNG/creating-a-hash-with-cng
 '
-' 2025-11-25. Gustav Brock, Cactus Data ApS, CPH.
+' 2026-01-08. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function CngHmac( _
-    ByRef TextData As LongPtr, _
+    ByVal TextData As LongPtr, _
     ByVal TextDataLength As Long, _
-    ByRef KeyData As LongPtr, _
+    ByVal KeyData As LongPtr, _
     ByVal KeyDataLength As Long, _
     Optional ByVal BcryptHashAlgorithmId As BcHashAlgorithm = BcHashAlgorithm.bcSha256) _
     As Byte()
@@ -887,7 +905,7 @@ End Function
 ' To be called from function Decrypt.
 '
 ' Original code by Erik A, 2019.
-' 2021-10-24. Gustav Brock, Cactus Data ApS, CPH.
+' 2026-01-08. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function DecryptData( _
     ByRef EncryptedData() As Byte, _
@@ -913,8 +931,9 @@ Public Function DecryptData( _
     ElseIf EncryptedByteLength(UBound(EncryptedData) - LBound(EncryptedData) + 1) = 0 Then
         ' Data length is below minimum.
     Else
-        ' Get the SHA1 hash of the key.
+        ' Get the SHA1 hash of the key. Could be modified to use SHA256.
         KeyHash = HashData(KeyData, bcSha1)
+        ReDim Preserve KeyHash(0 To SecretLength - 1)
         ' Get the pointer to IVector. The last 16 bytes is IVector.
         IVector = VarPtr(EncryptedData(UBound(EncryptedData) - LBound(EncryptedData) + 1 - IVectorLength))
         ' Decrypt the data.
@@ -937,7 +956,7 @@ Public Function DecryptData( _
                 ' No useful data.
                 ' Leave DecryptedData empty, and return False.
             Else
-                ' Get the hash of the decrypted data.
+                ' Get the SHA1 hash of the decrypted data. Could be modified to use SHA256.
                 DataHash = CngHash(VarPtr(Data(SizeLength)), DataLength, bcSha1)
                 ' Verify the hash.
                 For Index = LBound(DataHash) To UBound(DataHash)
@@ -1143,7 +1162,7 @@ End Function
 '   encrypted data will be unique for every call.
 '
 ' Original code by Erik A, 2019.
-' 2022-04-03. Gustav Brock, Cactus Data ApS, CPH.
+' 2026-01-08. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function EncryptData( _
     ByRef TextData() As Byte, _
@@ -1163,15 +1182,16 @@ Public Function EncryptData( _
     Dim InputHashLength     As Long
     Dim Result              As Boolean
     
-    ' Get SHA1 hash of the data and of the KeyData.
+    ' Get SHA1 hash of the data and of the KeyData. Could be modified to use SHA256.
     InputHash = HashData(TextData, bcSha1)
     If StrPtr(InputHash) = 0 Then
         ' Empty data. Exit with success.
         Result = True
     Else
         InputHashLength = UBound(InputHash) + 1
+        ' Get the SHA1 hash of the key. Could be modified to use SHA256.
         KeyHash = HashData(KeyData, bcSha1)
-        ReDim Preserve KeyHash(0 To SecretLength)
+        ReDim Preserve KeyHash(0 To SecretLength - 1)
     End If
     
     If StrPtr(InputHash) = 0 Or StrPtr(KeyHash) = 0 Then
